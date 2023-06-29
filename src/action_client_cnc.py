@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
+import os
+import sys
 import json
 
 import rospy
@@ -15,8 +17,9 @@ class CNCActionClient(object):
     _feedback = TestRequestActionFeedback()
     _result =  TestRequestActionResult()
 
-    def __init__(self, ns = 'cnc_manager', wait_for_server = False, 
-                cnc_airblock_topic = "cnc_airblock_activate", 
+    def __init__(self, ns = 'cnc_action_server', wait_for_server = False,
+                cnc_airblock_topic = "cnc_airblock_activate",
+                cnc_gnd_topic = "cnc_GND",
                 cnc_chuck_topic = "cnc_chuck_open",
                 init_ros_node = True):
 
@@ -32,11 +35,14 @@ class CNCActionClient(object):
 
         CONTROL_PNEUMATICS = True
         if CONTROL_PNEUMATICS:
-            from digital_interface_msgs.msg import PinStateWrite
+            from digital_interface_msgs.srv import PinStateWrite
             self.CNC_AIRBLOCK_TOPIC = cnc_airblock_topic
+            self.CNC_GND_TOPIC = cnc_gnd_topic
             self.CNC_CHUCK_TOPIC = cnc_chuck_topic
             self.cnc_airblock_svc = rospy.ServiceProxy(self.CNC_AIRBLOCK_TOPIC, PinStateWrite)
+            self.cnc_gnd_svc = rospy.ServiceProxy(self.CNC_GND_TOPIC, PinStateWrite)
             self.cnc_chuck_svc = rospy.ServiceProxy(self.CNC_CHUCK_TOPIC, PinStateWrite)
+            self.prepare_pneumatics()
 
         self.delimiter = ' '
 
@@ -49,13 +55,12 @@ class CNCActionClient(object):
 
         rospy.loginfo("CNC action client /{} started".format(self.ns))
 
-        
         self.load_and_check_parameters()
 
-        self.prepare_pneumatics()
-    #def call_server(self, gcode_index:int = 0, rotation:float = 0):
     def prepare_pneumatics(self):
         self.cnc_airblock_svc.call(True)
+        self.cnc_gnd_svc.call(False)
+        self.move_chuck(command = 'open')
 
     def move_chuck(self, command = 'close'):
         assert command in ['close', 'open']
@@ -65,19 +70,22 @@ class CNCActionClient(object):
         else:
             self.cnc_chuck_svc.call(False)
         return 0
-        
+
     def load_and_check_parameters(self):
         self.DICTIONARY_FILENAME = 'dictionary.json'
-        with open(self.DICTIONARY_FILENAME , 'r') as f:
+
+        script_dir = os.path.dirname(__file__)
+        abs_dict_path = os.path.join(script_dir, self.DICTIONARY_FILENAME)
+        with open(abs_dict_path, "r") as f:
             data = json.load(f)
 
         self.GCODE_TO_INT_DICT = data
         #print(self.GCODE_TO_INT_DICT)
         #rospy.loginfo("{}\n{}".format(np.unique(self.GCODE_TO_INT_DICT.values()).size, len(self.GCODE_TO_INT_DICT.values())))
         n_unique_values = np.unique(list(self.GCODE_TO_INT_DICT.values())).size
-        assert n_unique_values == len(self.GCODE_TO_INT_DICT.values()) 
+        assert n_unique_values == len(self.GCODE_TO_INT_DICT.values())
 
-    def call_server(self, gcode_operation_name, rotation = 0):
+    def call_server(self, gcode = None, gcode_operation_name = None, rotation = 0):
 
         assert gcode_operation_name in self.GCODE_TO_INT_DICT.keys()
         assert (rotation >= 0) and (rotation <= 360)
@@ -85,23 +93,27 @@ class CNCActionClient(object):
         gcode_index = self.GCODE_TO_INT_DICT[gcode_operation_name]
 
         goal = self.goal
-        #goal_string_split = goal_string.split(self.delimiter)
-        # smoke detector type and rotation
-        #type = goal_string_split[0]
-        #rotation = goal_string_split[1]
 
-        goal.result_text = str(rotation)
-        goal.the_result = gcode_index
+        if gcode is not None:
+            # We actually wnat to directly send some G-code
+            goal.result_text = gcode
+            goal.the_result = -1 # -1 so the action server knows to just run G-code
+        else:
+            goal.result_text = str(rotation)
+            goal.the_result = gcode_index
 
         # Send command to run G code for smoke detector type "t" and rotation "rot"
         self._client.send_goal(goal)
         rospy.loginfo("CNC client sent goals: {} gcode command type name = {}, smoke detector_rotation = {}".format(self.ns, gcode_operation_name, rotation))
+        self._client.wait_for_result()
+        result = self._client.get_result()
 
-        return 0
+        rospy.loginfo("CNC client got result: {}".format(result))
+        return result
 
     def example_call(self):
         self.call_server(gcode_operation_name = 'homing', rotation = 100)
-        self.call_server(gcode_operation_name = 'smoke_detector_fumonic_case_cut', rotation = 0)
+        #self.call_server(gcode_operation_name = 'smoke_detector_fumonic_case_cut', rotation = 0)
 
 if __name__ == '__main__':
     server = CNCActionClient(wait_for_server = True)
