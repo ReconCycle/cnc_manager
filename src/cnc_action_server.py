@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import json
+import numpy as np
 
 import time
 import serial
@@ -16,19 +18,25 @@ class SmokeDetector():
         self.type = float(smokedet_type) 
         self.radius= float(smokedet_radius)
         self.tabpos = None
+
 class CNCActionServer(object):
     _goal = TestRequestActionGoal()
     _feedback = TestRequestActionFeedback()
     _result =  TestRequestActionResult()
 
-    def __init__(self, ns = 'cnc_manager', initialize_cnc = False):
+    def __init__(self, ns = 'cnc_manager', init_ros_node = True, initialize_cnc = False):
         """ Interface between a ROS node (disassembly_manager) and the CNC machine.
         This action server receives a string that contains:
         - the orientation of the smoke detector in degrees
         - the type of smoke detector (int 0-5) """
+        if init_ros_node:
+            rospy.init_node('cnc_action_server')
+
         self.ns = ns
 
         self.delimiter = ' '
+
+        self.load_and_check_parameters()
 
         # Receiving messages from disassembly_pipeline.
         self._as = actionlib.SimpleActionServer(self.ns, actionlib.msg.TestRequestAction, execute_cb = self.execute_cb, auto_start = False)
@@ -41,22 +49,52 @@ class CNCActionServer(object):
         self.cnc_port = None
         if initialize_cnc: self.initialize_cnc()
 
+        # Initialize services
+    
+    #def call_server(self, gcode_index:int = 0, rotation:float = 0):
+    def load_and_check_parameters(self):
+        self.DICTIONARY_FILENAME = 'dictionary.json'
+        with open(self.DICTIONARY_FILENAME , 'r') as f:
+            data = json.load(f)
+
+        self.GCODE_TO_INT_DICT = data
+        print(self.GCODE_TO_INT_DICT)
+        #rospy.loginfo("{}\n{}".format(np.unique(self.GCODE_TO_INT_DICT.values()).size, len(self.GCODE_TO_INT_DICT.values())))
+        n_unique_values = np.unique(list(self.GCODE_TO_INT_DICT.values())).size
+        assert n_unique_values == len(self.GCODE_TO_INT_DICT.values()) 
+
+        self.INT_TO_GCODE_DICT = {v: k for k, v in self.GCODE_TO_INT_DICT.items()}
+
     def execute_cb(self, goal):
 
         rotation = float(goal.result_text)
         gcode_index = int(goal.the_result)
+        print("GCODE_TO_INT_DICT:")
+        print(self.GCODE_TO_INT_DICT)
+        print("Value:", gcode_index)
 
+        gcode_name = self.INT_TO_GCODE_DICT[gcode_index]
         #goal_string_split = goal_string.split(self.delimiter)
         # smoke detector type and rotation
         #type = goal_string_split[0]
         #rotation = goal_string_split[1]
 
-        assert (rotation > 0) and (rotation < 360), 'Invalid rotation parameters'
+        assert (rotation >= 0) and (rotation <= 360), 'Invalid rotation parameters'
 
         # Send command to run G code for smoke detector type "t" and rotation "rot"
-        rospy.loginfo("{} smoke detector type = {}, smoke detector_rotation = {}".format(self.ns, gcode_index, rotation))
+        rospy.loginfo("{} gcode_name = {}, smoke detector_rotation = {}".format(self.ns, gcode_name, rotation))
 
         # Do the CNC cutting
+        if gcode_name == 'homing':
+            self.home()
+        elif gcode_name == 'return_to_zero':
+            self.go_home()
+        elif gcode_name == 'smoke_detector_fumonic_case_cut':
+            # TODO put all this into cutSmokedetFumonicRadionet
+            cutSmokedetFumonicRadionet(server, (-241, -154))
+            self.go_home()
+        elif gcode_name == 'smoke_detector_fumonic_battery_tab_cut':
+            0
 
         # Set goal to success or whatever
         self._as.set_succeeded()
@@ -68,7 +106,8 @@ class CNCActionServer(object):
         min_com_port_n = 0
         max_com_port_n = 5
 
-        # 
+        port = None
+
         for i in range(min_com_port_n, max_com_port_n):
             try:
                 rospy.loginfo("Probing /dev/ttyUSB port {}".format(i))
@@ -79,7 +118,8 @@ class CNCActionServer(object):
                 break
             except Exception as e:
                 rospy.loginfo("CNC server Exception: {}".format(e))
-
+        if port is None: 
+            raise Exception("Did not find CNC at /dev/ttyUSB({0}-{1})".format(min_com_port_n, max_com_port_n))
         self.cnc_port = port
 
         self.enable_cnc()
@@ -88,6 +128,10 @@ class CNCActionServer(object):
 
         self.cnc_initialized = True
         return 0
+
+    def go_home(self):
+        string = 'G01X0Y0Z0F1000\n'
+        self.send_command(string)
 
     def enable_cnc(self):
         string = '$X\n'
@@ -224,16 +268,15 @@ def cutSmokedetFumonicRadionet(cnc_manager_class:CNCActionServer, init_pos:tuple
 
 
 if __name__ == '__main__':
-    rospy.init_node('cnc_manager')
     
-    server = CNCActionServer(initialize_cnc = True)
+    server = CNCActionServer(initialize_cnc = True, init_ros_node = True)
     
     #server.stopSpindle()
-    server.home()
+    #server.home()
     #server.startSpindle()
-    server.goto(X= -241, Y= -154, Z= 20, feed = 1000)
+    #server.goto(X= -241, Y= -154, Z= 20, feed = 1000)
     #server.goto(X= -100, Y= -100, Z= -15, feed=1000)
-    cutSmokedetFumonicRadionet(server, (-241, -154))
+    #cutSmokedetFumonicRadionet(server, (-241, -154))
     #server.goto(-100,-100,-100)
 
     rospy.spin()
