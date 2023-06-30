@@ -65,7 +65,7 @@ class CNCActionClient(object):
         else:
             self.cnc_chuck_svc.call(False)
         return 0
-        
+
     def load_and_check_parameters(self):
         self.DICTIONARY_FILENAME = 'dictionary.json'
         with open(self.DICTIONARY_FILENAME , 'r') as f:
@@ -97,7 +97,8 @@ class CNCActionClient(object):
         self._client.send_goal(goal)
         rospy.loginfo("CNC client sent goals: {} gcode command type name = {}, smoke detector_rotation = {}".format(self.ns, gcode_operation_name, rotation))
 
-        return 0
+        self._client.wait_for_result()
+        return self._client.get_result()
 
     def example_call(self):
         self.call_server(gcode_operation_name = 'homing', rotation = 100)
