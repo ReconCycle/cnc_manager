@@ -66,7 +66,6 @@ class CNCActionServer(object):
 
     def execute_cb(self, goal):
 
-        rotation = float(goal.result_text)
         gcode_index = int(goal.the_result)
 
         if gcode_index == -1:
@@ -74,35 +73,35 @@ class CNCActionServer(object):
             gcode_string = str(goal.result_text)
             if gcode_string[-2:] != '\n': gcode_string += '\n'
             self.send_command(gcode_string)
-            return 0
 
-        print("GCODE_TO_INT_DICT:")
-        print(self.GCODE_TO_INT_DICT)
-        print("Value:", gcode_index)
+        else:
+            rotation = float(goal.result_text)
 
-        gcode_name = self.INT_TO_GCODE_DICT[gcode_index]
-        #goal_string_split = goal_string.split(self.delimiter)
-        # smoke detector type and rotation
-        #type = goal_string_split[0]
-        #rotation = goal_string_split[1]
+            print("GCODE_TO_INT_DICT:")
+            print(self.GCODE_TO_INT_DICT)
+            print("Value:", gcode_index)
 
-        assert (rotation >= 0) and (rotation <= 360), 'Invalid rotation parameters'
+            gcode_name = self.INT_TO_GCODE_DICT[gcode_index]
+            #goal_string_split = goal_string.split(self.delimiter)
+            # smoke detector type and rotation
+            #type = goal_string_split[0]
+            #rotation = goal_string_split[1]
 
-        # Send command to run G code for smoke detector type "t" and rotation "rot"
-        rospy.loginfo("{} gcode_name = {}, smoke detector_rotation = {}".format(self.ns, gcode_name, rotation))
+            assert (rotation >= 0) and (rotation <= 360), 'Invalid rotation parameters'
 
-        # Do the CNC cutting
-        if gcode_name == 'homing':
-            self.home()
-        elif gcode_name == 'return_to_zero':
-            self.go_home()
-        elif gcode_name == 'smoke_detector_fumonic_case_cut':
-            # TODO put all this into cutSmokedetFumonicRadionet
-            cutSmokedetFumonicRadionet(self, (-241, -154))
-            self.go_home()
-        elif gcode_name == 'smoke_detector_fumonic_battery_tab_cut':
-            0
-
+            # Send command to run G code for smoke detector type "t" and rotation "rot"
+            rospy.loginfo("{} gcode_name = {}, smoke detector_rotation = {}".format(self.ns, gcode_name, rotation))
+            # Do the CNC cutting
+            if gcode_name == 'homing':
+                self.home()
+            elif gcode_name == 'return_to_zero':
+                self.go_home()
+            elif gcode_name == 'smoke_detector_fumonic_case_cut':
+                # TODO put all this into cutSmokedetFumonicRadionet
+                cutSmokedetFumonicRadionet(self, (-241, -154))
+                self.go_home()
+            elif gcode_name == 'smoke_detector_fumonic_battery_tab_cut':
+                0
         # Set goal to success or whatever
         self._result.result.the_result = 1
         self._as.set_succeeded(self._result.result)
