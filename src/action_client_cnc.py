@@ -85,26 +85,50 @@ class CNCActionClient(object):
         n_unique_values = np.unique(list(self.GCODE_TO_INT_DICT.values())).size
         assert n_unique_values == len(self.GCODE_TO_INT_DICT.values())
 
-    def call_server(self, gcode = None, gcode_operation_name = None, rotation = 0):
+    def call_server(self, gcode = None):
+        """ Function to call the CNC Action server.
+        Can be used to:
+        1. Send single G-code line (specify gcode = 'G01X-10Y-10Z-10F100')
+        2. Send a list of G-codes (if type(gcode) == list)
+        
+        Args:
+        ------------------
+        gcode : If not None, it can be either a type(list) or type(string)."""
+        goal = self.goal
+
+
+        if type(gcode) != list:
+            gcode = [gcode]
+
+        for element in gcode:
+            # We actually wnat to directly send some G-code
+            goal.result_text = element
+            goal.the_result = -1 # -1 so the action server knows to just run G-code
+
+            result = self.send_goal(goal)
+        # Return only the last result
+        return result
+    
+    def call_server_prespecified(self, gcode_operation_name = None, rotation = 0):
+        """   Function to:
+        Command the server to run one of (n) pre-specified g-codes, as seen in self.GCODE_TO_INT_DICT.
+        """
+        goal = self.goal
 
         assert gcode_operation_name in self.GCODE_TO_INT_DICT.keys()
         assert (rotation >= 0) and (rotation <= 360)
-
         gcode_index = self.GCODE_TO_INT_DICT[gcode_operation_name]
 
-        goal = self.goal
-
-        if gcode is not None:
-            # We actually wnat to directly send some G-code
-            goal.result_text = gcode
-            goal.the_result = -1 # -1 so the action server knows to just run G-code
-        else:
-            goal.result_text = str(rotation)
-            goal.the_result = gcode_index
-
-        # Send command to run G code for smoke detector type "t" and rotation "rot"
-        self._client.send_goal(goal)
+        goal.result_text = str(rotation)
+        goal.the_result = gcode_index
+        
         rospy.loginfo("CNC client sent goals: {} gcode command type name = {}, smoke detector_rotation = {}".format(self.ns, gcode_operation_name, rotation))
+
+        result = self.send_goal(goal)
+        return result
+
+    def send_goal(self, goal):
+        self._client.send_goal(goal)
         self._client.wait_for_result()
         result = self._client.get_result()
 
