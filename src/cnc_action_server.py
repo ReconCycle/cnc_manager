@@ -238,7 +238,7 @@ class CNCActionServer(object):
 
     def send_command(self, string_command):
 
-        rospy.loginfo("Sending CNC command:".format(string_command))
+        rospy.loginfo("Sending CNC command: {}".format(string_command))
         self.cnc_port.write(bytes(string_command,'utf-8'))
 
         output = self.cnc_port.readline()
