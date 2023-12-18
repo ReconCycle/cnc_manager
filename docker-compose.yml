@@ -1,0 +1,17 @@
+version: '3'
+services:
+  raspi-cnc-block:
+    container_name: raspi-cnc
+    image: cnc:devel
+    privileged: true 
+    devices:
+    #command: tail -f /dev/null
+    command: "/bin/bash -c 'source /root/catkin_ws/devel/setup.bash && cd /root/catkin_ws/src/cnc_manager/src/ && python3 cnc_action_server.py'"
+    devices:
+      - /dev:/dev
+    environment:
+      - "ROS_MASTER_URI=http://10.20.0.1:11311"
+      - "ROS_IP=10.20.0.158"
+    network_mode: "host"
+    tty: true
+
