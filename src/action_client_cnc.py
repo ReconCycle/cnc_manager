@@ -58,7 +58,11 @@ class CNCActionClient(object):
         self.load_and_check_parameters()
 
     def prepare_pneumatics(self):
-        self.cnc_airblock_svc.call(True)
+        try:
+            self.cnc_airblock_svc.call(True)
+        except rospy.service.ServiceException:
+            rospy.loginfo("CNC action client {} didn't get response from cnc_airblock_svc {}".format(self.ns, self.CNC_AIRBLOCK_TOPIC))
+            pass
         self.cnc_gnd_svc.call(False)
         self.move_chuck(command = 'open')
 
