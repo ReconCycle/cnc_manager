@@ -40,7 +40,7 @@ WORKDIR $CATKIN_WS/src
 
 RUN git clone https://github.com/ReconCycle/digital_interface_msgs.git
 #COPY src $CATKIN_WS/src
-RUN git clone -b cnc-block https://github.com/ReconCycle/cnc_manager.git
+RUN git clone https://github.com/ReconCycle/cnc_manager.git
 
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
     && cd $CATKIN_WS \
