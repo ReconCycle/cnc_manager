@@ -5,7 +5,7 @@ import RPi.GPIO as GPIO
 
 pin_open = 20
 pin_close = 21
-GPIO.setmode(GPIO.BCM
+GPIO.setmode(GPIO.BCM)
 GPIO.setup(pin_open, GPIO.OUT)
 GPIO.setup(pin_close, GPIO.OUT)
 
