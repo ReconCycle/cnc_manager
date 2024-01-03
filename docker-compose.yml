@@ -6,12 +6,12 @@ services:
     privileged: true 
     devices:
     #command: tail -f /dev/null
-    command: "/bin/bash -c 'source /root/catkin_ws/devel/setup.bash && cd /root/catkin_ws/src/cnc_manager/src/ && python3 cnc_action_server.py'"
+    command: "/bin/bash -c 'source /root/catkin_ws/devel/setup.bash && cd /root/catkin_ws/src/cnc_manager/src/ && python3 cnc_action_server.py && cnc_air_server.py'"
     devices:
       - /dev:/dev
     environment:
       - "ROS_MASTER_URI=http://10.20.0.1:11311"
-      - "ROS_IP=10.20.0.158"
+      - "ROS_IP=10.20.1.165"
     network_mode: "host"
     tty: true
 
